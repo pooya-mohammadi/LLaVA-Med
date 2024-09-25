@@ -1,3 +1,6 @@
+import traceback
+
+from _testcapi import traceback_print
 from os.path import join, split, exists
 import os
 import json
@@ -34,38 +37,42 @@ def main(args):
     # join the threads when you finally need the results.
     # They will fatch your urls in the background without
     # blocking your main application.
-    with ThreadPool(10000) as pool:
-        threads = []
-        for idx, sample in enumerate(tqdm(input_data)):
-            try:
-                output_path = os.path.join(args.pmc_output_path, os.path.basename(sample['pmc_tar_url']))
-                if os.path.exists(output_path):
-                    continue
-                task = pool.apply_async(func=getter, args=(sample['pmc_tar_url'], output_path))
-                threads.append(task)
-                # t = threading.Thread(target=getter, args=(sample['pmc_tar_url'], output_path))
-                # t.start()
-                # threads.append(t)
-                # urllib.request.urlretrieve(sample['pmc_tar_url'], output_path)
-            except HTTPError as e:
-                print('Error downloading PMC article: {}'.format(sample['pmc_tar_url']))
-                continue
-        outputs = []
-        for task in tqdm(threads):
-            outputs.append(task.get())
+    # with ThreadPool(10000) as pool:
+    #     threads = []
+    #     for idx, sample in enumerate(tqdm(input_data)):
+    #         try:
+    #             output_path = os.path.join(args.pmc_output_path, os.path.basename(sample['pmc_tar_url']))
+    #             if os.path.exists(output_path):
+    #                 continue
+    #             task = pool.apply_async(func=getter, args=(sample['pmc_tar_url'], output_path))
+    #             threads.append(task)
+    #             # t = threading.Thread(target=getter, args=(sample['pmc_tar_url'], output_path))
+    #             # t.start()
+    #             # threads.append(t)
+    #             # urllib.request.urlretrieve(sample['pmc_tar_url'], output_path)
+    #         except HTTPError as e:
+    #             print('Error downloading PMC article: {}'.format(sample['pmc_tar_url']))
+    #             continue
+    #     outputs = []
+    #     for task in tqdm(threads):
+    #         outputs.append(task.get())
 
     # Untar all PMC articles
     untar_dir = args.pmc_output_path + "_untar"
     os.makedirs(untar_dir, exist_ok=True)
     print(f'Untarring PMC articles: {untar_dir}')
     for sample in tqdm(input_data):
-        fname = os.path.join(args.pmc_output_path, os.path.basename(os.path.join(sample['pmc_tar_url'])))
-        name = split(fname)[-1].replace(".tar.gz", "")
-        if exists(join(untar_dir, name)):
-            continue
-        tar = tarfile.open(fname, "r:gz")
-        tar.extractall(untar_dir)
-        tar.close()
+        try:
+            fname = os.path.join(args.pmc_output_path, os.path.basename(os.path.join(sample['pmc_tar_url'])))
+            name = split(fname)[-1].replace(".tar.gz", "")
+            if exists(join(untar_dir, name)) or not exists(fname):
+                continue
+            tar = tarfile.open(fname, "r:gz")
+            tar.extractall(untar_dir)
+            tar.close()
+            print("[INFO] Worked fine!")
+        except Exception as e:
+            print(f"skipping: {sample}, {e}")
 
     # Copy to images directory
     print('Copying images')
